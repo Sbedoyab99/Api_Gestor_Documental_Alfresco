@@ -43,6 +43,17 @@ Comprobar la integración:
 Invoke-RestMethod http://localhost:8080/api/repository/health
 ```
 
+### Documentación de la API
+
+Con la aplicación en ejecución:
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- OpenAPI YAML: `http://localhost:8080/v3/api-docs.yaml`
+
+Estas rutas y el endpoint de salud son públicos. Los demás endpoints permanecen
+protegidos por Spring Security.
+
 ### Detener el entorno
 
 ```powershell
