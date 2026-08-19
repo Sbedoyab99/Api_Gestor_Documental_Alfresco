@@ -1,0 +1,98 @@
+name: alfresco-gestor
+
+# Entorno local mínimo para desarrollar contra Alfresco Community.
+# Búsqueda y transformación se añadirán cuando una historia las necesite.
+services:
+  postgres:
+    image: postgres:17.9
+    mem_limit: 512m
+    environment:
+      POSTGRES_DB: alfresco
+      POSTGRES_USER: alfresco
+      POSTGRES_PASSWORD: alfresco
+    command: postgres -c max_connections=300 -c log_min_messages=LOG
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  activemq:
+    image: alfresco/alfresco-activemq:6.2.6-jre17-rockylinux8
+    mem_limit: 1g
+    environment:
+      ACTIVEMQ_ADMIN_LOGIN: admin
+      ACTIVEMQ_ADMIN_PASSWORD: admin
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/activemq/bin/activemq query --objname 'type=Broker,brokerName=*,service=Health' | grep -q Good
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    volumes:
+      - activemq-data:/opt/activemq/data
+    restart: unless-stopped
+
+  alfresco:
+    image: alfresco/alfresco-content-repository-community:26.2.0
+    mem_limit: 2g
+    depends_on:
+      postgres:
+        condition: service_healthy
+      activemq:
+        condition: service_healthy
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -Dencryption.keystore.type=JCEKS
+        -Dencryption.cipherAlgorithm=DESede/CBC/PKCS5Padding
+        -Dencryption.keyAlgorithm=DESede
+        -Dencryption.keystore.location=/usr/local/tomcat/shared/classes/alfresco/extension/keystore/keystore
+        -Dmetadata-keystore.password=mp6yc0UD9e
+        -Dmetadata-keystore.aliases=metadata
+        -Dmetadata-keystore.metadata.password=oKIWzVdEdA
+        -Dmetadata-keystore.metadata.algorithm=DESede
+      JAVA_OPTS: >-
+        -Ddb.driver=org.postgresql.Driver
+        -Ddb.username=alfresco
+        -Ddb.password=alfresco
+        -Ddb.url=jdbc:postgresql://postgres:5432/alfresco
+        -Dindex.subsystem.name=noindex
+        -Dmessaging.broker.url="failover:(nio://activemq:61616)?timeout=3000&jms.useCompression=true"
+        -Dmessaging.broker.username=admin
+        -Dmessaging.broker.password=admin
+        -Dalfresco.host=localhost
+        -Dalfresco.port=8081
+        -Dalfresco.protocol=http
+        -Dshare.host=localhost
+        -Dshare.port=8081
+        -Dcsrf.filter.enabled=false
+        -Daos.baseUrlOverwrite=http://localhost:8081/alfresco/aos
+        -Ddeployment.method=DOCKER_COMPOSE
+        -XX:MinRAMPercentage=50
+        -XX:MaxRAMPercentage=80
+    ports:
+      - "8081:8080"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:8080/alfresco/api/-default-/public/alfresco/versions/1/probes/-ready-
+      interval: 20s
+      timeout: 5s
+      retries: 15
+      start_period: 2m
+    volumes:
+      - alfresco-data:/usr/local/tomcat/alf_data
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  activemq-data:
+  alfresco-data:
